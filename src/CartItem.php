@@ -1,27 +1,40 @@
 <?php
 
-namespace Fluent\ShoppingCart;
+namespace MuratDemirel\Cart;
 
-use Fluent\ShoppingCart\Contracts\Buyable;
-use Tightenco\Collect\Contracts\Support\Arrayable;
-use Tightenco\Collect\Contracts\Support\Jsonable;
-use Tightenco\Collect\Support\Arr;
+use CodeIgniter\Config\Config;
+use MuratDemirel\Cart\Models\CartItems as CartItemsModel;
 
-class CartItem implements Arrayable, Jsonable
-{
+
+class CartItem {
+
+    /**
+     * Model Instance
+     *
+     * @var MuratDemirel\Cart\Models\CartItems
+     */
+    protected CartItemsModel $cartItemsModel;
+
     /**
      * The rowID of the cart item.
      *
-     * @var string
+     * @var int
      */
-    public $rowId;
+    public $id;
 
     /**
-     * The ID of the cart item.
+     * The ID of the cart.
+     *
+     * @var int
+     */
+    public $cartId;
+
+    /**
+     * The Product ID of the cart item.
      *
      * @var int|string
      */
-    public $id;
+    public $productId;
 
     /**
      * The quantity for this cart item.
@@ -38,7 +51,7 @@ class CartItem implements Arrayable, Jsonable
     public $name;
 
     /**
-     * The price without TAX of the cart item.
+     * The price of the cart item.
      *
      * @var float
      */
@@ -50,6 +63,20 @@ class CartItem implements Arrayable, Jsonable
      * @var object
      */
     public $options;
+
+    /**
+     * The option price for this cart item.
+     *
+     * @var int|float|null
+     */
+    public $optionPrice;
+
+    /**
+     * The seller id for this cart item.
+     *
+     * @var int|null
+     */
+    public $sellerId;
 
     /**
      * The FQN of the associated model.
@@ -73,194 +100,296 @@ class CartItem implements Arrayable, Jsonable
     private $isSaved = false;
 
     /**
+     * Config
+     *
+     * @var object
+     */
+    protected $config;
+
+
+    /**
+     * The total price with option prices of the cart item.
+     *
+     * @var float
+     */
+    public $priceWithOption;
+
+    /**
+     * The unit price with TAX of the cart item.
+     *
+     * @var float
+     */
+    public $unitPrice;
+
+
+    /**
      * CartItem constructor.
      *
-     * @param int|string $id
-     * @param string     $name
-     * @param float      $price
-     * @param array      $options
+     * @param int|object|boolean $id
+     * @param int|string         $productId
+     * @param string             $productTitle
+     * @param float|int          $price
+     * @param array              $options
+     * @param int                $cartId
+     * @param int|float|null     $tax
+     * @param int|null           $qty
+     * @param int|null           $sellerId
+     * @param int|float|null     $optionPrice
      */
-    public function __construct($id, $name, $price, array $options = [])
-    {
-        if (empty($id)) {
-            throw new \InvalidArgumentException('Please supply a valid identifier.');
-        }
+    public function __construct($id = false, $productId = null, $productTitle = null, $price = null, $cartId = null, array $options = [], $optionPrice = null, $qty = null, $sellerId = null, $tax = null) {
 
-        if (empty($name)) {
-            throw new \InvalidArgumentException('Please supply a valid name.');
-        }
 
-        if (strlen($price) < 0 || !is_numeric($price)) {
-            throw new \InvalidArgumentException('Please supply a valid price.');
-        }
+        $this->cartItemsModel = new CartItemsModel();
+        $this->config = Config::get('Cart');
 
-        $this->id = $id;
-        $this->name = $name;
-        $this->price = $price;
-        $this->options = new CartItemOptions($options);
-        $this->rowId = static::generateRowId($id, $options);
+
+        if (is_integer($id)) {
+            $item = $this->cartItemsModel->find($id);
+            if (!$item) {
+                throw new \InvalidArgumentException('Please supply a valid id.');
+            }
+            return new self($item);
+        } else if (is_object($id)) {
+
+            $this->productId    = $id->productId;
+            $this->productTitle = $id->productTitle;
+            $this->cartId       = $id->cartId;
+            $this->price        = $id->price;
+            $this->tax          = $id->tax ?? $this->config->defaultTax;
+            $this->qty          = $id->qty ?? 1;
+            $this->sellerId     = $id->sellerId;
+            $this->options      = json_decode($id->options);
+            $this->optionPrice  = $id->optionPrice;
+            $this->id           = $id->id;
+            $this->setUnitPrice();
+
+        } else {
+            if (empty($productId)) {
+                throw new \InvalidArgumentException('Please supply a valid identifier.');
+            }
+
+            if (empty($productTitle)) {
+                throw new \InvalidArgumentException('Please supply a valid name.');
+            }
+
+            if (strlen($price) < 0 || !is_numeric($price)) {
+                throw new \InvalidArgumentException('Please supply a valid price.');
+            }
+
+            if (empty($cartId)) {
+                throw new \InvalidArgumentException('Please supply a valid cart id.');
+            }
+
+            $this->productId    = $productId;
+            $this->productTitle = $productTitle;
+            $this->cartId       = $cartId;
+            $this->price        = $price;
+            $this->tax          = $tax ?? $this->config->defaultTax;
+            $this->qty          = $qty ?? 1;
+            $this->sellerId     = $sellerId;
+            $this->options      = json_decode(json_encode($options));
+            $this->optionPrice  = $optionPrice;
+            $this->id           = false;
+            $this->setUnitPrice();
+        }
+    }
+
+    /**
+     * Sets total price with option and returns it
+     *
+     * @return float
+     */
+    public function setPriceWithOption() {
+        $isSum = $this->config->optionPriceSum;
+        if (!$this->optionPrice) {
+            $this->priceWithOption = static::numberFormat($this->price ?? 0);
+            return $this->priceWithOption;
+        } else if (!$isSum) {
+            $this->priceWithOption = static::numberFormat($this->price ? ( $this->price * $this->optionPrice ) : 0);
+            return $this->priceWithOption;
+        }
+        $this->priceWithOption = static::numberFormat($this->optionPrice ?? 0);
+        return $this->priceWithOption;
+    }
+
+    /**
+     * Sets total price per unit with tax and returns it
+     *
+     * @return float
+     */
+    public function setUnitPrice() {
+        $price       = $this->setPriceWithOption();
+        $tax         = $this->tax;
+        $taxIncluded = $this->config->taxIncluded;
+
+        if (!$price) {
+            $this->unitPrice = static::numberFormat(0);
+            return $this->unitPrice;
+        } else if (!$tax) {
+            $this->unitPrice = static::numberFormat($price);
+            return $this->unitPrice;
+        } else if ($taxIncluded) {
+            $this->priceWithOption = static::numberFormat($price * ( ( 100 - $tax ) / 100 ));
+            $this->unitPrice       = static::numberFormat($price);
+            return $this->unitPrice;
+        }
+        $this->unitPrice = static::numberFormat($price * ( ( 100 + $tax ) / 100 ));
+        return $this->unitPrice;
     }
 
     /**
      * Return the formatted price without TAX.
      *
-     * @param int|null    $decimals
-     * @param string|null $decimalPoint
-     * @param string|null $thousandSeparator
-     * @return string
+     * @return float
      */
-    public function price($decimals = null, $decimalPoint = null, $thousandSeparator = null)
-    {
-        return static::numberFormat($this->price, $decimals, $decimalPoint, $thousandSeparator);
+    public function price() {
+        return static::numberFormat($this->priceWithOption);
     }
 
     /**
      * Return the formatted price with TAX.
      *
-     * @param int|null    $decimals
-     * @param string|null $decimalPoint
-     * @param string|null $thousandSeparator
-     * @return string
+     * @return float
      */
-    public function priceTax($decimals = null, $decimalPoint = null, $thousandSeparator = null)
-    {
-        return static::numberFormat($this->priceTax, $decimals, $decimalPoint, $thousandSeparator);
+    public function priceTax() {
+        return static::numberFormat($this->unitPrice);
     }
 
     /**
      * Returns the formatted subTotal.
      *
-     * @param int|null    $decimals
-     * @param string|null $decimalPoint
-     * @param string|null $thousandSeparator
-     * @return string
+     * @return float
      */
-    public function subTotal($decimals = null, $decimalPoint = null, $thousandSeparator = null)
-    {
-        return static::numberFormat($this->subTotal, $decimals, $decimalPoint, $thousandSeparator);
+    public function subTotal() {
+        return static::numberFormat($this->subTotal);
     }
 
     /**
      * Returns the formatted total.
      *
-     * @param int|null    $decimals
-     * @param string|null $decimalPoint
-     * @param string|null $thousandSeparator
-     * @return string
+     * @return float
      */
-    public function total($decimals = null, $decimalPoint = null, $thousandSeparator = null)
-    {
-        return static::numberFormat($this->total, $decimals, $decimalPoint, $thousandSeparator);
+    public function total() {
+        return static::numberFormat($this->total);
     }
 
     /**
      * Returns the formatted tax.
      *
-     * @param int|null    $decimals
-     * @param string|null $decimalPoint
-     * @param string|null $thousandSeparator
-     * @return string
+     * @return float
      */
-    public function tax($decimals = null, $decimalPoint = null, $thousandSeparator = null)
-    {
-        return static::numberFormat($this->tax, $decimals, $decimalPoint, $thousandSeparator);
+    public function tax() {
+        return static::numberFormat($this->unitPrice - $this->priceWithOption);
     }
 
     /**
-     * Returns the formatted tax.
+     * Returns the formatted total tax.
      *
-     * @param int|null    $decimals
-     * @param string|null $decimalPoint
-     * @param string|null $thousandSeparator
-     * @return string
+     * @return float
      */
-    public function taxTotal($decimals = null, $decimalPoint = null, $thousandSeparator = null)
-    {
-        return static::numberFormat($this->taxTotal, $decimals, $decimalPoint, $thousandSeparator);
+    public function taxTotal() {
+        return static::numberFormat($this->taxTotal);
+    }
+
+    /**
+     * Save the cart item to database
+     *
+     * @return integer inserted id
+     */
+    public function save() {
+        $this->id = $this->cartItemsModel->insert([
+            'productId'    => $this->productId,
+            'productTitle' => $this->productTitle,
+            'cartId'       => $this->cartId,
+            'options'      => json_encode($this->options),
+            'qty'          => $this->qty,
+            'sellerId'     => $this->sellerId,
+            'tax'          => static::numberFormat($this->tax),
+            'price'        => static::numberFormat($this->price),
+            'optionPrice'  => static::numberFormat($this->optionPrice)
+        ]);
+
+        return $this->id;
+    }
+
+    /**
+     * Update the cart item on database and class with array items
+     *
+     * @param array $data
+     *
+     * @return $this
+     */
+    public function updateFromArray(array $data = []) {
+        $mergedData              = array_merge([
+            'productId'    => $this->productId,
+            'productTitle' => $this->productTitle,
+            'cartId'       => $this->cartId,
+            'options'      => $this->options,
+            'qty'          => $this->qty,
+            'sellerId'     => $this->sellerId,
+            'tax'          => static::numberFormat($this->tax),
+            'price'        => static::numberFormat($this->price),
+            'optionPrice'  => static::numberFormat($this->optionPrice)
+        ], $data);
+        $mergedData[ 'options' ] = json_encode($mergedData[ 'options' ]);
+
+        $updated = $this->cartItemsModel->update($this->id, $mergedData);
+        if ($updated) {
+            $this->productId    = $mergedData[ 'productId' ];
+            $this->productTitle = $mergedData[ 'productTitle' ];
+            $this->cartId       = $mergedData[ 'cartId' ];
+            $this->options      = json_decode($mergedData[ 'options' ]);
+            $this->qty          = $mergedData[ 'qty' ];
+            $this->sellerId     = $mergedData[ 'sellerId' ];
+            $this->tax          = $mergedData[ 'tax' ];
+            $this->price        = $mergedData[ 'price' ];
+            $this->optionPrice  = $mergedData[ 'optionPrice' ];
+            $this->setUnitPrice();
+        }
+
+        return $this;
     }
 
     /**
      * Set the quantity for the cart item.
      *
      * @param int|float $qty
-     * @return void
+     *
+     * @return $this
      */
-    public function setQuantity($qty)
-    {
+    public function setQuantity($qty) {
         if (empty($qty) || !is_numeric($qty)) {
             throw new \InvalidArgumentException('Please supply a valid quantity.');
         }
 
-        $this->qty = $qty;
+        $updated = $this->cartItemsModel->update($this->id, [ 'qty' => $qty ]);
+        if ($updated) {
+            $this->qty = $qty;
+        }
+
+        return $this;
     }
 
     /**
-     * Update the cart item from a buyable.
+     * Delete the cart item from the database
      *
-     * @param \Fluent\ShoppingCart\Contracts\Buyable $item
-     * @return void
+     * @return $this
      */
-    public function updateFromBuyable(Buyable $item)
-    {
-        $this->id = $item->getBuyableIdentifier($this->options);
-        $this->name = $item->getBuyableDescription($this->options);
-        $this->price = $item->getBuyablePrice($this->options);
-        $this->priceTax = $this->price + $this->tax;
-    }
+    public function delete() {
 
-    /**
-     * Update the cart item from an array.
-     *
-     * @param array $attributes
-     * @return void
-     */
-    public function updateFromArray(array $attributes)
-    {
-        $this->id = Arr::get($attributes, 'id', $this->id);
-        $this->qty = Arr::get($attributes, 'qty', $this->qty);
-        $this->name = Arr::get($attributes, 'name', $this->name);
-        $this->price = Arr::get($attributes, 'price', $this->price);
-        $this->options = new CartItemOptions(Arr::get($attributes, 'options', $this->options));
-        $this->priceTax = $this->price + $this->tax;
+         return $this->cartItemsModel->delete($this->id);
 
-        $this->rowId = $this->generateRowId($this->id, $this->options->all());
     }
 
     /**
      * Associate the cart item with the given model.
      *
      * @param mixed $model
-     * @return \Fluent\ShoppingCart\CartItem
+     *
+     * @return \MuratDemirel\Cart\CartItem
      */
-    public function associate($model)
-    {
+    public function associate($model) {
         $this->associatedModel = is_string($model) ? $model : get_class($model);
-
-        return $this;
-    }
-
-    /**
-     * Set the tax rate.
-     *
-     * @param int|float $taxRate
-     * @return \Fluent\ShoppingCart\CartItem
-     */
-    public function setTaxRate($taxRate)
-    {
-        $this->taxRate = $taxRate;
-
-        return $this;
-    }
-
-    /**
-     * Set saved state.
-     *
-     * @param bool $bool
-     * @return \Fluent\ShoppingCart\CartItem
-     */
-    public function setSaved($bool)
-    {
-        $this->isSaved = $bool;
 
         return $this;
     }
@@ -269,32 +398,24 @@ class CartItem implements Arrayable, Jsonable
      * Get an attribute from cart item or get the associated model.
      *
      * @param $attribute
+     *
      * @return mixed
      */
-    public function __get($attribute)
-    {
+    public function __get($attribute) {
         if (property_exists($this, $attribute)) {
             return $this->{$attribute};
         }
 
-        if ($attribute === 'priceTax') {
-            return number_format(($this->price + $this->tax), 2, '.', '');
-        }
-
-        if ($attribute === 'subtotal') {
-            return number_format(($this->qty * $this->price), 2, '.', '');
+        if ($attribute === 'subTotal') {
+            return $this->qty * $this->priceWithOption;
         }
 
         if ($attribute === 'total') {
-            return number_format(($this->qty * $this->priceTax), 2, '.', '');
-        }
-
-        if ($attribute === 'tax') {
-            return number_format(($this->price * ($this->taxRate / 100)), 2, '.', '');
+            return $this->unitPrice * $this->qty;
         }
 
         if ($attribute === 'taxTotal') {
-            return number_format(($this->tax * $this->qty), 2, '.', '');
+            return $this->tax() * $this->qty;
         }
 
         if ($attribute === 'model' && isset($this->associatedModel)) {
@@ -305,91 +426,97 @@ class CartItem implements Arrayable, Jsonable
     }
 
     /**
-     * Create a new instance from a Buyable.
+     * Create a new instance from the given id.
      *
-     * @param \Fluent\ShoppingCart\Contracts\Buyable $item
-     * @param array                                         $options
-     * @return \Fluent\ShoppingCart\CartItem
+     * @param integer $id
+     *
+     * @return \MuratDemirel\Cart\CartItem
      */
-    public static function fromBuyable(Buyable $item, array $options = [])
-    {
-        return new self($item->getBuyableIdentifier($options), $item->getBuyableDescription($options), $item->getBuyablePrice($options), $options);
+    public static function fromId($id) {
+        return new self($id);
+    }
+
+    /**
+     * Create a new instance from the given item.
+     *
+     * @param object $item
+     *
+     * @return \MuratDemirel\Cart\CartItem
+     */
+    public static function fromItem($item) {
+        return new self($item);
     }
 
     /**
      * Create a new instance from the given array.
      *
-     * @param array $attributes
-     * @return \Fluent\ShoppingCart\CartItem
+     * @param array   $attributes
+     * @param integer $cartId
+     *
+     * @return \MuratDemirel\Cart\CartItem
      */
-    public static function fromArray(array $attributes)
-    {
-        $options = Arr::get($attributes, 'options', []);
+    public static function fromArray(array $attributes, $cartId) {
+        $l = array_merge([
+            'productId'    => null,
+            'productTitle' => null,
+            'price'        => null,
+            'cartId'       => null,
+            'options'      => [],
+            'optionPrice'  => null,
+            'qty'          => 1,
+            'sellerId'     => null,
+            'tax'          => null,
+        ], $attributes);
 
-        return new self($attributes['id'], $attributes['name'], $attributes['price'], $options);
+        return new self(false, $l[ 'productId' ], $l[ 'productTitle' ], $l[ 'price' ], $cartId, $l[ 'options' ], $l[ 'optionPrice' ], $l[ 'qty' ], $l[ 'sellerId' ], $l[ 'tax' ]);
     }
 
     /**
      * Create a new instance from the given attributes.
      *
-     * @param int|string $id
-     * @param string     $name
-     * @param float      $price
-     * @param array      $options
-     * @return \Fluent\ShoppingCart\CartItem
-     */
-    public static function fromAttributes($id, $name, $price, array $options = [])
-    {
-        return new self($id, $name, $price, $options);
-    }
-
-    /**
-     * Generate a unique id for the cart item.
+     * @param int|string     $productId
+     * @param string         $productTitle
+     * @param float|int      $price
+     * @param array          $options
+     * @param int            $cartId
+     * @param int|float|null $tax
+     * @param int|null       $qty
+     * @param int|null       $sellerId
+     * @param int|float|null $optionPrice
      *
-     * @param string $id
-     * @param array  $options
-     * @return string
+     * @return \MuratDemirel\Cart\CartItem
      */
-    protected static function generateRowId($id, array $options)
-    {
-        ksort($options);
-
-        return md5($id . serialize($options));
+    public static function fromAttributes($productId, $productTitle, $price, $cartId, array $options = [], $optionPrice = null, $qty = null, $sellerId = null, $tax = null) {
+        return new self(false, $productId, $productTitle, $price, $cartId, $options, $optionPrice, $qty, $sellerId, $tax);
     }
+
 
     /**
      * Get the instance as an array.
      *
      * @return array
      */
-    public function toArray()
-    {
-        return [
-            'rowId'    => $this->rowId,
-            'id'       => $this->id,
-            'name'     => $this->name,
-            'qty'      => $this->qty,
-            'price'    => $this->price,
-            'options'  => $this->options->toArray(),
-            'tax'      => $this->tax,
-            'isSaved'  => $this->isSaved,
-            'subTotal' => $this->subTotal,
-        ];
-    }
+    public function toArray() {
+        return $this->productId ? [
 
-    /**
-     * Convert the object to its JSON representation.
-     *
-     * @param int $options
-     * @return string
-     */
-    public function toJson($options = 0)
-    {
-        if (isset($this->associatedModel)) {
-            return json_encode(array_merge($this->toArray(), ['model' => $this->model]), $options);
-        }
+            'id'           => $this->id,
+            'productId'    => $this->productId,
+            'productTitle' => $this->productTitle,
+            'cartId'       => $this->cartId,
+            'options'      => $this->options,
+            'qty'          => $this->qty,
+            'sellerId'     => $this->sellerId,
+            'tax'          => $this->tax . '%',
 
-        return json_encode($this->toArray(), $options);
+            'price'        => $this->price(),
+            'unitTax'      => $this->tax(),
+            'priceWithTax' => $this->priceTax(),
+            'subTotal'     => $this->subTotal(),
+            'totalTax'     => $this->taxTotal(),
+            'total'        => $this->total(),
+            'optionPrice'  => static::numberFormat($this->optionPrice)
+
+        ] : [];
     }
 
     /**
@@ -399,21 +526,14 @@ class CartItem implements Arrayable, Jsonable
      * @param int|null    $decimals
      * @param string|null $decimalPoint
      * @param string|null $thousandSeparator
+     *
      * @return string
      */
-    public static function numberFormat($value, $decimals = null, $decimalPoint = null, $thousandSeparator = null)
-    {
-        if (is_null($decimals)) {
-            $decimals = config('Cart')->format['decimals'] ?? 2;
-        }
-
-        if (is_null($decimalPoint)) {
-            $decimalPoint = config('Cart')->format['decimal_point'] ?? '.';
-        }
-
-        if (is_null($thousandSeparator)) {
-            $thousandSeparator = config('Cart')->format['thousand_separator'] ?? ',';
-        }
+    public static function numberFormat($value, $decimals = null, $decimalPoint = null, $thousandSeparator = null) {
+        $format            = config('Cart')->format;
+        $decimals          = $decimals ?? $format[ 'decimals' ];
+        $decimalPoint      = $decimalPoint ?? $format[ 'decimal_point' ];
+        $thousandSeparator = $thousandSeparator ?? $format[ 'thousand_separator' ];
 
         return number_format($value, $decimals, $decimalPoint, $thousandSeparator);
     }

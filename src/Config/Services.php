@@ -1,8 +1,8 @@
 <?php
 
-namespace Fluent\ShoppingCart\Config;
+namespace MuratDemirel\Cart\Config;
 
-use Fluent\ShoppingCart\Cart;
+use MuratDemirel\Cart\Cart;
 use CodeIgniter\Config\BaseService;
 
 class Services extends BaseService

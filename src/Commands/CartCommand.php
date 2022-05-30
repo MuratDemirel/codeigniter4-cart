@@ -1,6 +1,6 @@
 <?php
 
-namespace Fluent\ShoppingCart\Commands;
+namespace MuratDemirel\Cart\Commands;
 
 use CodeIgniter\CLI\BaseCommand;
 use CodeIgniter\CLI\CLI;
@@ -14,7 +14,7 @@ class CartCommand extends BaseCommand
      *
      * @var string
      */
-    protected $group = 'Shopping Cart';
+    protected $group = 'Cart';
 
     /**
      * The command's name.
@@ -62,7 +62,10 @@ class CartCommand extends BaseCommand
         $path = "{$this->sourcePath}/Config/Cart.php";
 
         $content = file_get_contents($path);
-        $content = str_replace('namespace Fluent\ShoppingCart\Config', 'namespace App\Config', $content);
+        $content = str_replace('namespace MuratDemirel\Cart\Config', 'namespace Config', $content);
+        $content = str_replace("use CodeIgniter\\Config\\BaseConfig;\n", '', $content);
+        $content = str_replace('extends BaseConfig', 'extends \\MuratDemirel\\Cart\\Config\\Cart', $content);
+
 
         $this->writeFile('Config/Cart.php', $content);
     }

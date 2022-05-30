@@ -1,6 +1,6 @@
 <?php
 
-namespace Fluent\ShoppingCart\Exceptions;
+namespace MuratDemirel\Cart\Exceptions;
 
 use RuntimeException;
 

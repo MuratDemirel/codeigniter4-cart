@@ -1,6 +1,6 @@
 <?php
 
-namespace Fluent\ShoppingCart\Contracts;
+namespace MuratDemirel\Cart\Contracts;
 
 interface Buyable
 {

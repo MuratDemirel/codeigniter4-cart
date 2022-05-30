@@ -1,6 +1,6 @@
 <?php
 
-namespace Fluent\ShoppingCart;
+namespace MuratDemirel\Cart;
 
 trait CanBeBought
 {

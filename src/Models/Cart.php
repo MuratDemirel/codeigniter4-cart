@@ -1,19 +1,19 @@
 <?php
 
-namespace Fluent\ShoppingCart\Models;
+namespace MuratDemirel\Cart\Models;
 
 use CodeIgniter\Config\Config;
 use CodeIgniter\Model;
 
-class ShoppingCart extends Model
+class Cart extends Model
 {
     protected $table;
     protected $primaryKey = 'id';
     protected $returnType = 'object';
-    protected $allowedFields = ['identifier', 'instance', 'content'];
+    protected $allowedFields = ['id', 'identifier', 'instance'];
     protected $useTimestamps = true;
-    protected $createdField = 'created_at';
-    protected $updatedField = 'updated_at';
+    protected $createdField = 'createdAt';
+    protected $updatedField = 'updatedAt';
 
     /**
      * Get config table name.
@@ -24,6 +24,6 @@ class ShoppingCart extends Model
     {
         parent::__construct();
         
-        $this->table = Config::get('Cart')->table ?? 'shoppingcart';
+        $this->table = Config::get('Cart')->cartTable ?? 'cart';
     }
 }
