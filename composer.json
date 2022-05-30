@@ -10,13 +10,11 @@
         }
     ],
     "require": {
-        "php": "^8.0 || ^8.1",
         "codeigniter4/framework": "^4.1",
-        "tightenco/collect": "^v9.12"
     },
     "autoload": {
         "psr-4": {
-            "Fluent\\ShoppingCart\\": "src"
+            "MuratDemirel\\Cart\\": "src"
         }
     },
     "require-dev": {
