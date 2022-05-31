@@ -201,7 +201,8 @@ class CartItem {
      */
     public function setPriceWithOption() {
         $isSum = $this->config->optionPriceSum;
-        if (!$this->optionPrice) {
+        echo gettype($this->optionPrice);
+        if (!floatval($this->optionPrice)) {
             $this->priceWithOption = static::numberFormat($this->price ?? 0);
             return $this->priceWithOption;
         } else if (!$isSum) {
@@ -219,21 +220,21 @@ class CartItem {
      */
     public function setUnitPrice() {
         $price       = $this->setPriceWithOption();
-        $tax         = $this->tax;
+        $tax         = floatval($this->tax);
         $taxIncluded = $this->config->taxIncluded;
 
         if (!$price) {
-            $this->unitPrice = static::numberFormat(0);
+            $this->unitPrice = 0;
             return $this->unitPrice;
         } else if (!$tax) {
-            $this->unitPrice = static::numberFormat($price);
+            $this->unitPrice = floatval($price);
             return $this->unitPrice;
         } else if ($taxIncluded) {
-            $this->priceWithOption = static::numberFormat($price * ( ( 100 - $tax ) / 100 ));
+            $this->priceWithOption = static::numberFormat(floatval($price) * ( ( 100 - $tax ) / 100 ));
             $this->unitPrice       = static::numberFormat($price);
             return $this->unitPrice;
         }
-        $this->unitPrice = static::numberFormat($price * ( ( 100 + $tax ) / 100 ));
+        $this->unitPrice = static::numberFormat(floatval($price) * ( ( 100 + $tax ) / 100 ));
         return $this->unitPrice;
     }
 
@@ -279,7 +280,7 @@ class CartItem {
      * @return float
      */
     public function tax() {
-        return static::numberFormat($this->unitPrice - $this->priceWithOption);
+        return static::numberFormat(floatval($this->unitPrice) - floatval($this->priceWithOption));
     }
 
     /**
@@ -304,9 +305,9 @@ class CartItem {
             'options'      => json_encode($this->options),
             'qty'          => $this->qty,
             'sellerId'     => $this->sellerId,
-            'tax'          => static::numberFormat($this->tax),
-            'price'        => static::numberFormat($this->price),
-            'optionPrice'  => static::numberFormat($this->optionPrice)
+            'tax'          => floatval(static::numberFormat($this->tax)),
+            'price'        => floatval(static::numberFormat($this->price)),
+            'optionPrice'  => floatval(static::numberFormat($this->optionPrice))
         ]);
 
         return $this->id;
@@ -407,15 +408,15 @@ class CartItem {
         }
 
         if ($attribute === 'subTotal') {
-            return $this->qty * $this->priceWithOption;
+            return floatval($this->qty) * floatval($this->priceWithOption);
         }
 
         if ($attribute === 'total') {
-            return $this->unitPrice * $this->qty;
+            return floatval($this->unitPrice) * floatval($this->qty);
         }
 
         if ($attribute === 'taxTotal') {
-            return $this->tax() * $this->qty;
+            return floatval($this->tax()) * floatval($this->qty);
         }
 
         if ($attribute === 'model' && isset($this->associatedModel)) {

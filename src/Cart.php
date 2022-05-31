@@ -338,7 +338,7 @@ class Cart {
     public function count() {
         $count = 0;
         array_walk($this->cartItems, function ($v) use (&$count) {
-            $count += $v->qty;
+            $count += floatval($v->qty);
         });
         return CartItem::numberFormat($count);
     }
@@ -351,7 +351,7 @@ class Cart {
     public function total() {
         $count = 0;
         array_walk($this->cartItems, function ($v) use (&$count) {
-            $count += $v->total();
+            $count += floatval($v->total());
         });
         return CartItem::numberFormat($count);
     }
@@ -365,8 +365,8 @@ class Cart {
      * @return float
      */
     public function tax($total = null, $subtotal = null) {
-        $total    = $total ?? $this->total();
-        $subtotal = $subtotal ?? $this->subtotal();
+        $total    = floatval($total ?? $this->total());
+        $subtotal = floatval($subtotal ?? $this->subtotal());
 
         return CartItem::numberFormat(( $total - $subtotal ));
     }
@@ -380,8 +380,8 @@ class Cart {
      * @return float
      */
     public function taxRate($total = null, $subtotal = null) {
-        $total    = $total ?? $this->total();
-        $subtotal = $subtotal ?? $this->subtotal();
+        $total    = floatval($total ?? $this->total());
+        $subtotal = floatval($subtotal ?? $this->subtotal());
 
         return CartItem::numberFormat(100-(( 100 / $total ) * $subtotal));
     }
@@ -394,7 +394,7 @@ class Cart {
     public function subtotal() {
         $count = 0;
         array_walk($this->cartItems, function ($v) use (&$count) {
-            $count += $v->subTotal();
+            $count += floatval($v->subTotal());
         });
         return CartItem::numberFormat($count);
     }
