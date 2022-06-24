@@ -154,12 +154,12 @@ class CartItem {
             $this->productId    = $id->productId;
             $this->productTitle = $id->productTitle;
             $this->cartId       = $id->cartId;
-            $this->price        = $id->price;
+            $this->price        = floatval($id->price);
             $this->tax          = $id->tax ?? $this->config->defaultTax;
             $this->qty          = $id->qty ?? 1;
             $this->sellerId     = $id->sellerId;
             $this->options      = json_decode($id->options);
-            $this->optionPrice  = $id->optionPrice;
+            $this->optionPrice  = floatval($id->optionPrice);
             $this->id           = $id->id;
             $this->setUnitPrice();
 
@@ -183,12 +183,12 @@ class CartItem {
             $this->productId    = $productId;
             $this->productTitle = $productTitle;
             $this->cartId       = $cartId;
-            $this->price        = $price;
+            $this->price        = floatval($price);
             $this->tax          = $tax ?? $this->config->defaultTax;
             $this->qty          = $qty ?? 1;
             $this->sellerId     = $sellerId;
             $this->options      = json_decode(json_encode($options));
-            $this->optionPrice  = $optionPrice;
+            $this->optionPrice  = floatval($optionPrice);
             $this->id           = false;
             $this->setUnitPrice();
         }
