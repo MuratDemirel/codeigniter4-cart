@@ -193,13 +193,6 @@ class Cart {
         if (empty($arr)) {
             return false;
         }
-        if (empty($this->cartItems)) {
-            $existing = [];
-        } else {
-            $existing = array_filter($this->cartItems, function ($k) use ($arr) {
-                return $k->productId == $arr[ 'productId' ] && $k->options == $arr[ 'options' ];
-            });
-        }
         if(!$this->config->allowDifferentSeller){
             if (!empty($this->cartItems)) {
                 $existing = array_filter($this->cartItems, function ($k) use ($arr) {
@@ -209,6 +202,13 @@ class Cart {
                     throw new InvalidSellerIdException("Inserting products from different seller is not allowed");
                 }
             }
+        }
+        if (empty($this->cartItems)) {
+            $existing = [];
+        } else {
+            $existing = array_filter($this->cartItems, function ($k) use ($arr) {
+                return $k->productId == $arr[ 'productId' ] && $k->options == $arr[ 'options' ];
+            });
         }
         if (empty($existing)) {
             $insertedId                     = $cartItem->save();
@@ -349,7 +349,7 @@ class Cart {
     public function count() {
         $count = 0;
         array_walk($this->cartItems, function ($v) use (&$count) {
-            $count += floatval($v->qty);
+            $count += $v->qty;
         });
         return CartItem::numberFormat($count);
     }
@@ -362,7 +362,7 @@ class Cart {
     public function total() {
         $count = 0;
         array_walk($this->cartItems, function ($v) use (&$count) {
-            $count += floatval($v->total());
+            $count += $v->total();
         });
         return CartItem::numberFormat($count);
     }
@@ -376,10 +376,10 @@ class Cart {
      * @return float
      */
     public function tax($total = null, $subtotal = null) {
-        $total    = floatval($total ?? $this->total());
-        $subtotal = floatval($subtotal ?? $this->subtotal());
+        $total    = $total ?? $this->total();
+        $subtotal = $subtotal ?? $this->subtotal();
 
-        return CartItem::numberFormat(( $total - $subtotal ));
+        return CartItem::numberFormat(( floatval($total) - floatval($subtotal) ));
     }
 
     /**
@@ -391,10 +391,10 @@ class Cart {
      * @return float
      */
     public function taxRate($total = null, $subtotal = null) {
-        $total    = floatval($total ?? $this->total());
-        $subtotal = floatval($subtotal ?? $this->subtotal());
+        $total    = $total ?? $this->total();
+        $subtotal = $subtotal ?? $this->subtotal();
 
-        return CartItem::numberFormat(100-(( 100 / $total ) * $subtotal));
+        return CartItem::numberFormat(100-(( 100 / floatval($total) ) * floatval($subtotal)));
     }
 
     /**
@@ -405,7 +405,7 @@ class Cart {
     public function subtotal() {
         $count = 0;
         array_walk($this->cartItems, function ($v) use (&$count) {
-            $count += floatval($v->subTotal());
+            $count += $v->subTotal();
         });
         return CartItem::numberFormat($count);
     }
