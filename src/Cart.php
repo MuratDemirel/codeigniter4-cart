@@ -6,6 +6,7 @@ use CodeIgniter\Config\Config;
 use CodeIgniter\HTTP\RequestInterface;
 use MuratDemirel\Cart\Contracts\Buyable;
 use MuratDemirel\Cart\Exceptions\InvalidRowIDException;
+use MuratDemirel\Cart\Exceptions\InvalidSellerIdException;
 use MuratDemirel\Cart\Exceptions\UnknownModelException;
 use MuratDemirel\Cart\Models\Cart as CartModel;
 use MuratDemirel\Cart\Models\CartItems as CartItemsModel;
@@ -198,6 +199,16 @@ class Cart {
             $existing = array_filter($this->cartItems, function ($k) use ($arr) {
                 return $k->productId == $arr[ 'productId' ] && $k->options == $arr[ 'options' ];
             });
+        }
+        if(!$this->config->allowDifferentSeller){
+            if (!empty($this->cartItems)) {
+                $existing = array_filter($this->cartItems, function ($k) use ($arr) {
+                    return $k->sellerId != $arr[ 'sellerId' ];
+                });
+                if($existing){
+                    throw new InvalidSellerIdException("Inserting products from different seller is not allowed");
+                }
+            }
         }
         if (empty($existing)) {
             $insertedId                     = $cartItem->save();
