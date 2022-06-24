@@ -206,10 +206,10 @@ class CartItem {
             $this->priceWithOption = static::numberFormat($this->price ?? 0);
             return $this->priceWithOption;
         } else if (!$isSum) {
-            $this->priceWithOption = static::numberFormat($this->price ? ( $this->price * $this->optionPrice ) : 0);
+            $this->priceWithOption = static::numberFormat($this->price ? ( $this->price + $this->optionPrice ) : 0);
             return $this->priceWithOption;
         }
-        $this->priceWithOption = static::numberFormat($this->optionPrice ?? 0);
+        $this->priceWithOption = static::numberFormat($this->optionPrice ?? $this->price ?? 0);
         return $this->priceWithOption;
     }
 
